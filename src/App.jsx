@@ -85,34 +85,54 @@ function App() {
     showToast('新的一段对话已经准备好了')
   }
 
-  const sendMessage = () => {
-    const text = messageText.trim()
-    if (!text) {
-      textareaRef.current?.focus()
-      return
-    }
-    const s = currentSession()
-    if (!s) return
-    const updatedMsg = [...s.msg, ['Winfrey', text, now(), 1]]
-    const updatedSession = { ...s, msg: updatedMsg, preview: text, date: '刚刚' }
-    setSessions(sessions.map(sess => sess.id === activeSessionId ? updatedSession : sess))
-    setMessageText('')
-    setIsSending(true)
-    setTimeout(() => {
-      const replies = [
-        '嗯，我听见了。你可以按自己的节奏慢慢说。',
-        '谢谢你愿意把这件事放在这里，我们先陪它坐一会儿。',
-        '这听起来很重要。你现在最希望被怎样理解？'
-      ]
-      const reply = replies[Math.floor(Math.random() * replies.length)]
-      const currentS = sessions.find(s => s.id === activeSessionId)
-      if (currentS) {
-        const newMsg = [...currentS.msg, ['Coco', reply, now()]]
-        setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, msg: newMsg, preview: reply } : s))
-      }
-      setIsSending(false)
-    }, 560)
+const sendMessage = async () => {
+  const text = messageText.trim()
+  if (!text) {
+    textareaRef.current?.focus()
+    return
   }
+  const s = currentSession()
+  if (!s) return
+
+  // 1. 先把用户的消息显示在界面上（乐观更新）
+  const updatedMsg = [...s.msg, ['Winfrey', text, now(), 1]]
+  const updatedSession = { ...s, msg: updatedMsg, preview: text, date: '刚刚' }
+  setSessions(sessions.map(sess => sess.id === activeSessionId ? updatedSession : sess))
+  setMessageText('')
+  setIsSending(true)
+
+  try {
+    // 2. 向后端发送请求（把地址换成你 Render 的真实地址）
+    const response = await fetch('https://winfrey-coco.onrender.com', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    })
+
+    const data = await response.json()
+
+    // 3. 检查后端是否返回了错误
+    if (!response.ok) {
+      throw new Error(data.error || '请求失败')
+    }
+
+    // 4. 把 AI 的回复追加到当前会话中
+    const reply = data.reply || '抱歉，我没有收到回复。'
+    const currentS = sessions.find(s => s.id === activeSessionId)
+    if (currentS) {
+      const newMsg = [...currentS.msg, ['Coco', reply, now()]]
+      setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, msg: newMsg, preview: reply } : s))
+    }
+
+  } catch (error) {
+    // 5. 如果出错了，显示提示
+    console.error('发送消息失败:', error)
+    showToast('连接失败，请检查后端是否正常运行')
+    // 把刚才显示的用户消息回滚（可选，这里简单处理）
+  } finally {
+    setIsSending(false)
+  }
+}
 
   const switchSession = (id) => {
     setActiveSessionId(id)
