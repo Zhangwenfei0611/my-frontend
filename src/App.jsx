@@ -103,7 +103,7 @@ const sendMessage = async () => {
 
   try {
     // 2. 向后端发送请求（把地址换成你 Render 的真实地址）
-    const response = await fetch('https://winfrey-coco.onrender.com', {
+  const response = await fetch('https://winfrey-coco.onrender.com/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text })
